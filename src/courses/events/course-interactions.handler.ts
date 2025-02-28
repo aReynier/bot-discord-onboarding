@@ -1,16 +1,16 @@
-import { ModalSubmitInteraction } from 'discord.js';
+import { Client, ModalSubmitInteraction } from 'discord.js';
 import { logger } from '../../config/logger';
 import { CourseService } from '../services/course.service';
 
 export class CourseInteractionsHandler {
     private courseService: CourseService;
 
-    constructor() {
-        this.courseService = new CourseService();
+    constructor(client: Client) {
+        this.courseService = new CourseService(client);
     }
 
     async handleModalSubmit(interaction: ModalSubmitInteraction) {
-        if (interaction.customId === 'create-course-modal') {
+        if (interaction.customId === 'create-course-modal-from-slash') {
             const courseName = interaction.fields.getTextInputValue('courseName');
             const isCertified = interaction.fields.getTextInputValue('isCertified') === 'true';
             
