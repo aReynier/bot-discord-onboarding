@@ -7,10 +7,23 @@ interface Course {
     isCertified: boolean;
     uuidGuild: string;
     uuidCategory: string;
-//    uuidRole: string;
+    uuidRole: string;
     createdAt: string;
     updatedAt: string;
 }
+
+interface Role {
+    uuidRole: string;
+    name: string;
+    color: string;
+    hoist: boolean;
+    position: string;
+    memberCount: string;
+    uuidGuild: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 
 export class CourseService {
     private apiUrl: string;
@@ -61,7 +74,7 @@ export class CourseService {
 
             const categoryId = "1344811915301490748";
 
-            const forumName = `Formation ${name}`;
+            const forumName = name;
             const existingForum = guild.channels.cache.find(
                 channel => channel.name === forumName && channel.type === ChannelType.GuildForum
             );
@@ -71,7 +84,7 @@ export class CourseService {
             }
 
             const forum = await guild.channels.create({
-                name: `Formation ${name}`,
+                name: `${name}`,
                 type: ChannelType.GuildForum,
                 parent: categoryId,
                 reason: `Création du forum pour la formation ${name}`
@@ -81,13 +94,35 @@ export class CourseService {
             try {
                 logger.debug('Création du rôle Discord...');
                 role = await guild.roles.create({
-                    name: `Campus ${name}`,
+                    name: `Formation ${name}`,
+                    color: '#FF0000',
                     reason: `Création du rôle pour la formation ${name}`
                 });
                 logger.debug({ roleId: role.id }, 'Rôle Discord créé avec succès');
             } catch (error) {
                 logger.error(error, 'Erreur lors de la création du rôle Discord');
                 throw new Error('Impossible de créer le rôle Discord pour la formation');
+            }
+
+            const roleResponse = await fetch(`${this.apiUrl}/roles`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: role.name,
+                    uuidGuild: guildId,
+                    uuidRole: role.id,
+                    memberCount: "0",
+                    rolePosition: "1",
+                    hoist: role.hoist,
+                    color: role.hexColor
+                }),
+            });
+    
+            if (!roleResponse.ok) {
+                await role.delete().catch(e => logger.error(e, 'Erreur lors de la suppression du rôle Discord'));
+                throw new Error('Erreur lors de la création du rôle dans l\'API');
             }
 
             const response = await fetch(`${this.apiUrl}/courses`, {
@@ -99,7 +134,10 @@ export class CourseService {
                     name,
                     isCertified,
                     uuidGuild: guildId,
-                    uuidCategory: forum.id }),
+                    uuidCategory: categoryId,
+                    uuidRole: role.id
+                    // roles: [role.id]
+                }),
             });
 
             if (!response.ok) {

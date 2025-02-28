@@ -9,11 +9,13 @@ import { execute as updatePostCommand } from './channels/commands/modify-stock-c
 import { execute as deletePostCommand } from './channels/commands/delete-stock-post.command';
 import { ChannelService } from './channels/services/channels-service';
 import { InteractionHandler } from './handlers/interaction.handler';
+import { InteractionHandler } from './campuses/events/interaction.handler';
+import { InteractionHandler as CourseInteractionHandler } from './courses/events/interaction.handler';
 
 dotenv.config();
 
 logger.info('🚀 Démarrage du bot...');
-
+ 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -54,6 +56,7 @@ logger.info("Commandes chargées dans le bot :", [...client.commands.keys()]);
 
 const interactionHandler = new InteractionHandler();
 let channelInteractionHandler: ChannelInteractionHandler;
+const courseInteractionHandler = new CourseInteractionHandler(client);
 
 client.once(Events.ClientReady, async (readyClient) => {
     logger.info(`✅ Bot connecté en tant que ${readyClient.user.tag}`);
@@ -144,6 +147,13 @@ client.on(Events.MessageCreate, (message) => {
 });
 
 // Gestion des erreurs globales
+    await interactionHandler.handleInteraction(interaction);
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+    await courseInteractionHandler.handleInteraction(interaction);
+});
+
 client.on(Events.Error, (error) => {
     logger.error(error, 'Une erreur est survenue avec le client Discord');
 });
