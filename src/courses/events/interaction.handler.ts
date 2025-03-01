@@ -18,14 +18,14 @@ export class InteractionHandler {
                     await this.courseInteractions.handleModalSubmit(interaction);
                     return;
                 }
-                // else if (interaction.isStringSelectMenu()) {
-                //     await this.courseInteractions.handleSelectMenu(interaction);
-                //     return;
-                // }
-                // else if (interaction.isButton()) {
-                //     await this.courseInteractions.handleButton(interaction);
-                //     return;
-                // }
+                else if (interaction.isStringSelectMenu()) {
+                    await this.courseInteractions.handleSelectMenu(interaction);
+                    return;
+                }
+                else if (interaction.isButton()) {
+                    await this.courseInteractions.handleButton(interaction);
+                    return;
+                }
             }
 
             if (interaction.isChatInputCommand()) {
