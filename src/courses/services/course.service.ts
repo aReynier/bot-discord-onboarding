@@ -1,5 +1,19 @@
-import { ChannelType, Client } from 'discord.js';
+import { ChannelType, Client, Guild } from 'discord.js';
 import { logger } from '../../config/logger';
+
+interface GuildData {
+    uuid: string;
+    name: string;
+    memberCount: string;
+    configuration: {};
+}
+
+interface CategoryData {
+    uuid: string;
+    uuidGuild: string;
+    name: string;
+    position: number;
+}
 
 interface Course {
     uuidCourse: string;
@@ -24,15 +38,81 @@ interface Role {
     updatedAt: string;
 }
 
-
 export class CourseService {
     private apiUrl: string;
     private client: Client;
-    private isCreating: boolean = false;
+    private readonly SIMPLON_GUILD: GuildData = {
+        uuid: "1338499599584722965",
+        name: "Simplon",
+        memberCount: "0",
+        configuration: {}
+    };
+    private readonly TEMPLATE_CATEGORY: CategoryData = {
+        uuid: "1344811915301490748",
+        uuidGuild: "1338499599584722965",
+        name: "Templates Formations",
+        position: 0
+    };
 
     constructor(client: Client) {
         this.apiUrl = process.env.API_URL || 'http://localhost:3000';
         this.client = client;
+    }
+
+    private async ensureGuild(): Promise<void> {
+            try {
+                const response = await fetch(`${this.apiUrl}/guilds/${this.SIMPLON_GUILD.uuid}`);
+                
+                if (!response.ok) {
+                    const createResponse = await fetch(`${this.apiUrl}/guilds`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.SIMPLON_GUILD),
+                    });
+    
+                    if (!createResponse.ok) {
+                        throw new Error('Impossible de créer la guild dans l\'API');
+                    }
+    
+                    logger.info('Guild créée dans l\'API avec succès');
+                }
+            } catch (error) {
+                logger.error(error, 'Erreur lors de la vérification/création de la guild dans l\'API');
+                throw error;
+            }
+    }
+
+    private async ensureTemplateCategory(): Promise<void> {
+        try {
+            logger.debug({
+                categoryData: this.TEMPLATE_CATEGORY,
+                endpoint: `${this.apiUrl}/categories/${this.TEMPLATE_CATEGORY.uuid}`
+            }, 'Vérification de la catégorie dans l\'API');
+    
+            const response = await fetch(`${this.apiUrl}/categories/${this.TEMPLATE_CATEGORY.uuid}`);
+            const categoryData = await response.json();
+            
+            if (!response.ok || !categoryData || !categoryData.uuid) {
+                const createResponse = await fetch(`${this.apiUrl}/categories`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.TEMPLATE_CATEGORY),
+                });
+
+                if (!createResponse.ok) {
+                    throw new Error('Impossible de créer la catégorie dans l\'API');
+                }
+
+                logger.info('Catégorie créée dans l\'API avec succès');
+            }
+        } catch (error) {
+            logger.error(error, 'Erreur lors de la vérification/création de la catégorie dans l\'API');
+            throw error;
+        }
     }
 
     async getAllCourses(): Promise<Course[]> {
@@ -61,6 +141,8 @@ export class CourseService {
 
     async createCourse(name: string, isCertified: boolean): Promise<Course> {
         try {
+            await this.ensureGuild();
+            await this.ensureTemplateCategory();
 
             const guildId = process.env.GUILD_ID;
             if (!guildId) {
