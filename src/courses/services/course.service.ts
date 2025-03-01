@@ -176,7 +176,7 @@ export class CourseService {
             try {
                 logger.debug('Création du rôle Discord...');
                 role = await guild.roles.create({
-                    name: `Formation ${name}`,
+                    name: name,
                     color: '#FF0000',
                     reason: `Création du rôle pour la formation ${name}`
                 });

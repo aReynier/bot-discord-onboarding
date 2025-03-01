@@ -20,21 +20,12 @@ export class CourseInteractionsHandler {
                     selectedStocks: []
                 });
 
-                const validateButton = new ButtonBuilder()
-                    .setCustomId('validate_certification')
-                    .setLabel('Valider')
-                    .setStyle(ButtonStyle.Primary)
-                    .setDisabled(true);
-
                 const row = new ActionRowBuilder<StringSelectMenuBuilder>()
                     .addComponents(this.createCertificationSelect());
 
-                const buttonRow = new ActionRowBuilder<ButtonBuilder>()
-                    .addComponents(validateButton);
-                
                 await interaction.reply({
                     content: `Configuration de la formation "${courseName}"\nLa formation est-elle certifiante ?`,
-                    components: [row, buttonRow],
+                    components: [row],
                     ephemeral: true
                 });
                 
@@ -82,22 +73,7 @@ export class CourseInteractionsHandler {
                     });
                 }
 
-                const validateButton = new ButtonBuilder()
-                    .setCustomId('validate_certification')
-                    .setLabel('Valider')
-                    .setStyle(ButtonStyle.Primary)
-                    .setDisabled(false);
-
-                const row = new ActionRowBuilder<StringSelectMenuBuilder>()
-                    .addComponents(this.createCertificationSelect(true));
-
-                const buttonRow = new ActionRowBuilder<ButtonBuilder>()
-                    .addComponents(validateButton);
-
-                await interaction.update({
-                    content: `Configuration de la formation\nType sélectionné : ${isCertified ? 'Certifiante' : 'Non certifiante'}`,
-                    components: [row, buttonRow]
-                });
+                await this.handleValidateCertification(interaction);
             } catch (error) {
                 logger.error(error, 'Erreur lors de la sélection du type de formation');
                 await interaction.reply({
@@ -108,7 +84,7 @@ export class CourseInteractionsHandler {
         }
     }
 
-    async handleValidateCertification(interaction: ButtonInteraction) {
+    async handleValidateCertification(interaction: StringSelectMenuInteraction) {
         try {
             const userData = this.courseData.get(interaction.user.id);
             if (!userData) {
@@ -177,10 +153,6 @@ export class CourseInteractionsHandler {
             });
         }
     }
-
-    private createStockSelect(disabled: boolean = false) {
-
-    } 
 
     async handleStockSelect(interaction: StringSelectMenuInteraction) {
         if (interaction.customId === 'stock_select') {
@@ -331,7 +303,7 @@ export class CourseInteractionsHandler {
                 await forumChannel.threads.create({
                     name: stockName,
                     message: {
-                        content: `Post créé à partir du template : ${stockName}`
+                        content: `Création du post ${stockName}`
                     }
                 });
             }
@@ -351,9 +323,6 @@ export class CourseInteractionsHandler {
 
     async handleButton(interaction: ButtonInteraction) {
         switch (interaction.customId) {
-            case 'validate_certification':
-                await this.handleValidateCertification(interaction);
-                break;
             case 'validate_stock':
                 await this.handleValidateStock(interaction);
                 break;
@@ -380,9 +349,9 @@ export class CourseInteractionsHandler {
         } catch (error) {
             logger.error(error, 'Erreur lors du traitement du select menu');
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({
+                await interaction.update({
                     content: '❌ Une erreur est survenue.',
-                    ephemeral: true
+                    components: []
                 });
             }
         }
