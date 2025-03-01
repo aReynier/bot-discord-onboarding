@@ -125,19 +125,25 @@ export class CourseService {
                 throw new Error('Erreur lors de la création du rôle dans l\'API');
             }
 
+            const courseData = {
+                name,
+                isCertified,
+                uuidGuild: guildId,
+                uuidCategory: categoryId,
+                uuidRole: role.id
+            };
+    
+            logger.debug({ 
+                courseData,
+                endpoint: `${this.apiUrl}/courses`
+            }, 'Tentative de création de formation dans l\'API');
+
             const response = await fetch(`${this.apiUrl}/courses`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    name,
-                    isCertified,
-                    uuidGuild: guildId,
-                    uuidCategory: categoryId,
-                    uuidRole: role.id
-                    // roles: [role.id]
-                }),
+                body: JSON.stringify(courseData),
             });
 
             if (!response.ok) {
