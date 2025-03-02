@@ -261,13 +261,16 @@ export class CourseInteractionsHandler {
     async handleValidateStock(interaction: ButtonInteraction) {
         try {
             const userData = this.courseData.get(interaction.user.id);
-            if (!userData || !userData.selectedStocks || userData.selectedStocks.length === 0) {
-                throw new Error('Aucun stock sélectionné');
+            if (!userData) {
+                throw new Error('Données de formation non trouvées');
             }
-
+    
+            const selectedStocks = userData.selectedStocks || [];
+    
             logger.debug({
-                selectedStocks: userData.selectedStocks
+                selectedStocks
             }, 'Stocks sélectionnés pour création');    
+     
     
             const forumCategoryId = "1344811915301490748";
             const forumChannel = interaction.guild?.channels.cache.filter(
@@ -299,19 +302,25 @@ export class CourseInteractionsHandler {
                 throw new Error('Forum channel not found');
             }
     
-            for (const stockName of userData.selectedStocks) {
-                await forumChannel.threads.create({
-                    name: stockName,
-                    message: {
-                        content: `Création du post ${stockName}`
-                    }
-                });
+            if (selectedStocks.length > 0) {
+                for (const stockName of selectedStocks) {
+                    await forumChannel.threads.create({
+                        name: stockName,
+                        message: {
+                            content: `Création du post ${stockName}`
+                        }
+                    });
+                }
             }
     
-            await interaction.update({
-                content: `✅ ${userData.selectedStocks.length} posts créé avec succès dans le forum !`,
-                components: []
-            });
+            const message = selectedStocks.length > 0 
+            ? `✅ ${selectedStocks.length} posts créés avec succès dans le forum !`
+            : '✅ Formation créée avec succès (aucun post ajouté)';
+
+        await interaction.update({
+            content: message,
+            components: []
+        });
         } catch (error) {
             logger.error(error, 'Erreur lors de la validation du stock');
             await interaction.reply({
