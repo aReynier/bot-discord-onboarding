@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ChannelType, Client, ModalSubmitInteraction, StringSelectMenuBuilder, StringSelectMenuInteraction, StringSelectMenuOptionBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ChannelType, Client, Collection, ForumChannel, GuildBasedChannel, ModalSubmitInteraction, StringSelectMenuBuilder, StringSelectMenuInteraction, StringSelectMenuOptionBuilder } from 'discord.js';
 import { logger } from '../../config/logger';
 import { CourseService } from '../services/course.service';
 
@@ -10,10 +10,36 @@ export class CourseInteractionsHandler {
         this.courseService = new CourseService(client);
     }
 
+    private async validateCourseName(interaction: ModalSubmitInteraction, courseName: string): Promise<boolean> {
+        const guild = interaction.guild;
+        if (!guild) {
+            throw new Error('Guild non trouvée');
+        }
+    
+        const existingChannel = guild.channels.cache.find(
+            channel => 
+                channel.name.toLowerCase() === courseName.toLowerCase() && 
+                channel.type === ChannelType.GuildForum
+        );
+    
+        if (existingChannel) {
+            await interaction.reply({
+                content: `❌ Une formation nommée "${courseName}" existe déjà.`,
+                ephemeral: true
+            });
+            return false;
+        }
+        return true;
+    }
+
     async handleModalSubmit(interaction: ModalSubmitInteraction) {
         if (interaction.customId === 'create-course-modal-from-slash') {            
             try {
                 const courseName = interaction.fields.getTextInputValue('courseName');
+
+                if(!await this.validateCourseName(interaction, courseName)) {
+                    return;
+                }
 
                 this.courseData.set(interaction.user.id, { 
                     name: courseName,
@@ -61,18 +87,23 @@ export class CourseInteractionsHandler {
             .setDisabled(disabled);
     }  
 
+    private updateCertificationStatus(userId: string, isCertified: boolean): void {
+        const userData = this.courseData.get(userId);
+        if (userData) {
+            this.courseData.set(userId, {
+                ...userData,
+                isCertified
+            });
+        }
+    }
+    
     async handleCertificationSelect(interaction: StringSelectMenuInteraction) {
         if (interaction.customId === 'certification_select') {
             try {
                 const isCertified = interaction.values[0] === 'true';
-                const userData = this.courseData.get(interaction.user.id);
-                if (userData) {
-                    this.courseData.set(interaction.user.id, {
-                        ...userData,
-                        isCertified
-                    });
-                }
-
+                
+                this.updateCertificationStatus(interaction.user.id, isCertified);
+                
                 await this.handleValidateCertification(interaction);
             } catch (error) {
                 logger.error(error, 'Erreur lors de la sélection du type de formation');
@@ -84,67 +115,86 @@ export class CourseInteractionsHandler {
         }
     }
 
+    private async createCourseFromUserData(userId: string): Promise<{ name: string, isCertified: boolean }> {
+        const userData = this.courseData.get(userId);
+        if (!userData) {
+            throw new Error('Données de formation non trouvées');
+        }
+    
+        await this.courseService.createCourse(
+            userData.name,
+            userData.isCertified ?? false,
+        );
+    
+        return {
+            name: userData.name,
+            isCertified: userData.isCertified ?? false
+        };
+    }
+    
+    private async getStockChannels(interaction: StringSelectMenuInteraction) {
+        const stockCategoryId = "1344320786722455552";
+        const stockChannels = interaction.guild?.channels.cache.filter(channel => 
+            channel.parentId === stockCategoryId
+        );
+    
+        if (!stockChannels || stockChannels.size === 0) {
+            await interaction.update({
+                content: '❌ Aucun stock disponible.',
+                components: []
+            });
+            return null;
+        }
+    
+        return stockChannels;
+    }
+    
+    private createStockSelectionMenu(stockChannels: Collection<string, GuildBasedChannel>) {
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('stock_select')
+            .setPlaceholder('Sélectionner un titre')
+            .addOptions(
+                stockChannels.map(channel => 
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(channel.name)
+                        .setValue(channel.id)
+                        .setDescription(`Stock: ${channel.name}`)
+                )
+            );
+    
+        const validateButton = new ButtonBuilder()
+            .setCustomId('validate_stock')
+            .setLabel('Valider')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(false);
+    
+        return {
+            selectMenu: new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu),
+            buttonRow: new ActionRowBuilder<ButtonBuilder>().addComponents(validateButton)
+        };
+    }
+    
     async handleValidateCertification(interaction: StringSelectMenuInteraction) {
         try {
-            const userData = this.courseData.get(interaction.user.id);
-            if (!userData) {
-                throw new Error('Données de formation non trouvées');
-            }
-
-            await this.courseService.createCourse(
-                userData.name,
-                userData.isCertified ?? false,
-            );
-
-            const stockCategoryId = "1344320786722455552";
-            const stockChannels = interaction.guild?.channels.cache.filter(channel => 
-                channel.parentId === stockCategoryId
-            );
-
-            if (!stockChannels || stockChannels.size === 0) {
-                await interaction.update({
-                    content: '❌ Aucun stock disponible.',
-                    components: []
-                });
-                return;
-            }
-
-            const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId('stock_select')
-                .setPlaceholder('Sélectionner un titre')
-                .addOptions(
-                    stockChannels.map(channel => 
-                        new StringSelectMenuOptionBuilder()
-                            .setLabel(channel.name)
-                            .setValue(channel.id)
-                            .setDescription(`Stock: ${channel.name}`)
-                    )
-                );
-
-             const validateButton = new ButtonBuilder()
-                .setCustomId('validate_stock')
-                .setLabel('Valider')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(false);
-
-            const row = new ActionRowBuilder<StringSelectMenuBuilder>()
-                .addComponents(selectMenu);
-
-            const buttonRow = new ActionRowBuilder<ButtonBuilder>()
-                .addComponents(validateButton);
-
+            const courseData = await this.createCourseFromUserData(interaction.user.id);
+    
+            const stockChannels = await this.getStockChannels(interaction);
+            if (!stockChannels) return; // Arrêt si pas de stocks disponibles
+    
+            const { selectMenu, buttonRow } = this.createStockSelectionMenu(stockChannels);
+    
             await interaction.update({
-                content: `✅ Formation "${userData.name}" créée avec succès !\nVeuillez maintenant sélectionner un channel du stock :`,
-                components: [row, buttonRow]
+                content: `✅ Formation "${courseData.name}" créée avec succès !\nVeuillez maintenant sélectionner un channel du stock :`,
+                components: [selectMenu, buttonRow]
             });
-
+    
             logger.info({
                 action: 'course_create_complete',
-                courseName: userData.name,
-                isCertified: userData.isCertified,
+                courseName: courseData.name,
+                isCertified: courseData.isCertified,
                 userId: interaction.user.id
             }, 'Formation créée avec succès');
-
+    
         } catch (error) {
             logger.error(error, 'Erreur lors de la validation de la formation');
             await interaction.reply({
@@ -258,69 +308,79 @@ export class CourseInteractionsHandler {
         }
     }
 
+    private getUserStocks(userId: string): string[] {
+        const userData = this.courseData.get(userId);
+        if (!userData) {
+            throw new Error('Données de formation non trouvées');
+        }
+        return userData.selectedStocks || [];
+    }
+    
+    private async getForumChannel(interaction: ButtonInteraction) {
+        const forumCategoryId = "1344811915301490748";
+        const forumChannel = interaction.guild?.channels.cache.filter(
+            channel => 
+                channel.parentId === forumCategoryId && 
+                channel.type === ChannelType.GuildForum
+        )
+        .sort((a:any, b:any) => b.createdTimestamp - a.createdTimestamp)
+        .first();
+    
+        logger.debug({
+            forumCategoryId,
+            forumChannelFound: !!forumChannel,
+            forumChannelType: forumChannel?.type,
+            availableForumChannels: interaction.guild?.channels.cache
+                .filter(channel => channel.parentId === forumCategoryId)
+                .map(c => ({ id: c.id, name: c.name, type: c.type }))
+        }, 'Forum channel debug');
+    
+        if (!forumChannel || forumChannel.type !== ChannelType.GuildForum) {
+            throw new Error('Forum channel not found');
+        }
+    
+        return forumChannel;
+    }
+    
+    private async createStockThreads(forumChannel: ForumChannel, stockNames: string[]) {
+        if (stockNames.length === 0) return;
+    
+        for (const stockName of stockNames) {
+            await forumChannel.threads.create({
+                name: stockName,
+                message: {
+                    content: `Création du post ${stockName}`
+                }
+            });
+        }
+    }
+    
+    private getCompletionMessage(stockCount: number): string {
+        return stockCount > 0 
+            ? `✅ ${stockCount} posts créés avec succès dans le forum !`
+            : '✅ Formation créée avec succès (aucun post ajouté)';
+    }
+    
     async handleValidateStock(interaction: ButtonInteraction) {
         try {
-            const userData = this.courseData.get(interaction.user.id);
-            if (!userData) {
-                throw new Error('Données de formation non trouvées');
-            }
-    
-            const selectedStocks = userData.selectedStocks || [];
-    
-            logger.debug({
-                selectedStocks
-            }, 'Stocks sélectionnés pour création');    
-     
-    
-            const forumCategoryId = "1344811915301490748";
-            const forumChannel = interaction.guild?.channels.cache.filter(
-                channel => 
-                    channel.parentId === forumCategoryId && 
-                    channel.type === ChannelType.GuildForum
-            )
-            .sort((a:any, b:any) => b.createdTimestamp - a.createdTimestamp)
-            .first();
+            // 1. Récupérer les stocks sélectionnés
+            const selectedStocks = this.getUserStocks(interaction.user.id);
             
-
-            logger.debug({
-                forumCategoryId,
-                forumChannelFound: !!forumChannel,
-                forumChannelType: forumChannel?.type,
-                availableForumChannels: interaction.guild?.channels.cache
-                    .filter(channel => channel.parentId === forumCategoryId)
-                    .map(c => ({ id: c.id, name: c.name, type: c.type }))
-            }, 'Forum channel debug');
+            logger.debug({ selectedStocks }, 'Stocks sélectionnés pour création');
     
-            const forumId = forumChannel?.id;
-
-            logger.debug({
-                forumId,
-                forumName: forumChannel?.name
-            }, 'Forum ID récupéré');
-
-            if (!forumChannel || forumChannel.type !== ChannelType.GuildForum) {
-                throw new Error('Forum channel not found');
-            }
+            // 2. Récupérer le channel du forum
+            const forumChannel = await this.getForumChannel(interaction);
     
-            if (selectedStocks.length > 0) {
-                for (const stockName of selectedStocks) {
-                    await forumChannel.threads.create({
-                        name: stockName,
-                        message: {
-                            content: `Création du post ${stockName}`
-                        }
-                    });
-                }
-            }
+            // 3. Créer les threads pour chaque stock
+            await this.createStockThreads(forumChannel, selectedStocks);
     
-            const message = selectedStocks.length > 0 
-            ? `✅ ${selectedStocks.length} posts créés avec succès dans le forum !`
-            : '✅ Formation créée avec succès (aucun post ajouté)';
-
-        await interaction.update({
-            content: message,
-            components: []
-        });
+            // 4. Envoyer le message de confirmation
+            const message = this.getCompletionMessage(selectedStocks.length);
+            await interaction.update({
+                content: message,
+                components: []
+            });
+    
         } catch (error) {
             logger.error(error, 'Erreur lors de la validation du stock');
             await interaction.reply({

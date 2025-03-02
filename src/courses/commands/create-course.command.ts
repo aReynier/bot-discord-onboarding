@@ -4,9 +4,42 @@ import {
     SlashCommandBuilder,
     TextInputBuilder,
     TextInputStyle,
-    ActionRowBuilder
+    ActionRowBuilder,
+    GuildMember
 } from 'discord.js';
 import { logger } from '../../config/logger';
+
+const AUTHORIZED_ROLES = ['Administrateur', 'Directeur', 'CDP'];
+
+async function checkUserPermissions(interaction: CommandInteraction): Promise<boolean> {
+    const member = interaction.member as GuildMember;
+    
+    if (!member) {
+        logger.error('Membre non trouvé');
+        return false;
+    }
+
+    const hasRequiredRole = member.roles.cache.some(role => 
+        AUTHORIZED_ROLES.includes(role.name)
+    );
+
+    if (!hasRequiredRole) {
+        await interaction.reply({
+            content: '❌ Vous devez être Administrateur, Directeur ou CDP pour créer une formation.',
+            ephemeral: true
+        });
+        
+        logger.warn({
+            userId: member.id,
+            userRoles: member.roles.cache.map(r => r.name),
+            action: 'create_course_unauthorized'
+        }, 'Tentative de création de formation non autorisée');
+        
+        return false;
+    }
+
+    return true;
+}
 
 export const data = new SlashCommandBuilder()
     .setName('create-course')
