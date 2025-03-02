@@ -1,17 +1,22 @@
-import { Interaction, CommandInteraction } from 'discord.js';
+import { Interaction, CommandInteraction, Client } from 'discord.js';
 import { logger } from '../config/logger';
 import { execute as executeCreateCampus } from '../campuses/commands/create-campus.command';
 import { execute as executeModifyCampus } from '../campuses/commands/modify-campus.command';
 import { execute as executeDeleteCampus } from '../campuses/commands/delete-campus.command';
 import { execute as executeShowCampusForm } from '../campuses/commands/show-campus-form.command';
 import { execute as executeSetupIdentification } from '../identification_requests/commands/setupIdentificationButton';
+import { execute as executeCreateCourse } from "../courses/commands/create-course.command";
 import { CampusInteractionsHandler } from '../campuses/events/campus-interactions.handler';
+import { CourseInteractionsHandler } from '../courses/events/course-interactions.handler';
+
 
 export class InteractionHandler {
     private campusInteractions: CampusInteractionsHandler;
+    private courseInteractions: CourseInteractionsHandler;
 
-    constructor() {
+    constructor(client: Client) {
         this.campusInteractions = new CampusInteractionsHandler();
+        this.courseInteractions = new CourseInteractionsHandler(client);
     }
 
     async handleInteraction(interaction: Interaction): Promise<void> {
@@ -24,6 +29,10 @@ export class InteractionHandler {
                         await execute(interaction);
                         return;
                     }
+                    if (interaction.customId === 'create-course-modal-from-slash') {
+                        await this.courseInteractions.handleModalSubmit(interaction);
+                        return;
+                    }
                     await this.campusInteractions.handleModalSubmit(interaction);
                     return;
                 }
@@ -31,6 +40,11 @@ export class InteractionHandler {
                     if (interaction.customId.startsWith('role-select-')) {
                         const { execute } = await import('../identification_requests/events/handleRoleSelection');
                         await execute(interaction);
+                        return;
+                    }
+                    if (interaction.customId === 'certification_select' || 
+                        interaction.customId === 'stock_select') {
+                        await this.courseInteractions.handleSelectMenu(interaction);
                         return;
                     }
                     await this.campusInteractions.handleSelectMenu(interaction);
@@ -49,6 +63,10 @@ export class InteractionHandler {
                     } else if (interaction.customId.startsWith('rules-accept-')) {
                         const { execute } = await import('../identification_requests/events/handleRulesAcceptance');
                         await execute(interaction);
+                        return;
+                    } else if (interaction.customId === 'validate_stock' || 
+                        interaction.customId === 'add_more_stock') {
+                        await this.courseInteractions.handleButton(interaction);
                         return;
                     }
                     await this.campusInteractions.handleButton(interaction);
@@ -102,6 +120,9 @@ export class InteractionHandler {
                     break;
                 case 'setup-identification':
                     await executeSetupIdentification(interaction);
+                    break;
+                case 'create-course':
+                    await executeCreateCourse(interaction);
                     break;
                 default:
                     if (!interaction.replied && !interaction.deferred) {
