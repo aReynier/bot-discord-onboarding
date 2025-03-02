@@ -1,4 +1,4 @@
-import { ChannelType, Client, Guild } from 'discord.js';
+import { ChannelType, Client, Guild, GuildChannel } from 'discord.js';
 import { logger } from '../../config/logger';
 
 interface GuildData {
@@ -242,5 +242,109 @@ export class CourseService {
             throw error;
         }
     }
-      
+
+    async deleteCourse(courseId: string): Promise<void> {
+        try {
+            const discordChannel = await this.client.channels.fetch(courseId);
+            if (!discordChannel || !('name' in discordChannel)) {
+                throw new Error('Course not found');
+            }
+    
+            if (!(discordChannel instanceof GuildChannel)) {
+                throw new Error('Invalid course type');
+            }
+    
+            logger.debug({
+                channelId: courseId,
+                channelName: discordChannel.name
+            }, 'Channel Discord trouvé');
+    
+            const response = await fetch(`${this.apiUrl}/courses`);
+        
+            if (!response.ok) {
+                const errorData = await response.text();
+                logger.error({
+                    status: response.status,
+                    errorData
+                }, 'Réponse d\'erreur de l\'API');
+                throw new Error('Erreur lors de la récupération des formations');
+            }
+    
+            const { data: courses } = await response.json();
+            
+            const course = courses.find((c: Course) => c.name === discordChannel.name);
+            
+            if (!course) {
+                throw new Error(`Formation "${discordChannel.name}" non trouvée`);
+            }
+    
+            logger.debug({
+                courseName: course.name,
+                courseUuid: course.uuid,
+                roles: course.roles
+            }, 'Formation trouvée avec ses rôles');
+    
+            // Stocker l'ID du rôle pour plus tard
+            const roleId = course.roles?.[0]?.uuidRole;
+    
+            // Supprimer d'abord la formation
+            logger.debug({
+                courseUuid: course.uuid,
+                endpoint: `${this.apiUrl}/courses/${course.uuid}`
+            }, 'Tentative de suppression de la formation');
+    
+            const deleteResponse = await fetch(`${this.apiUrl}/courses/${course.uuid}`, {
+                method: 'DELETE'
+            });
+    
+            if (!deleteResponse.ok) {
+                const errorText = await deleteResponse.text();
+                logger.error({
+                    status: deleteResponse.status,
+                    response: errorText
+                }, 'Erreur détaillée de la suppression de la formation');
+                throw new Error('Erreur lors de la suppression de la formation');
+            }
+    
+            logger.info({
+                courseId: course.uuid,
+                courseName: course.name
+            }, 'Formation supprimée avec succès');
+    
+            // Puis supprimer le rôle si on en avait un
+            if (roleId) {
+                logger.debug({
+                    roleId,
+                    endpoint: `${this.apiUrl}/roles/${roleId}`
+                }, 'Tentative de suppression du rôle');
+    
+                const deleteRoleResponse = await fetch(`${this.apiUrl}/roles/${roleId}`, {
+                    method: 'DELETE'
+                });
+    
+                if (!deleteRoleResponse.ok) {
+                    const errorText = await deleteRoleResponse.text();
+                    logger.error({
+                        status: deleteRoleResponse.status,
+                        response: errorText
+                    }, 'Erreur lors de la suppression du rôle');
+                    throw new Error('Erreur lors de la suppression du rôle');
+                }
+    
+                logger.info({
+                    roleId,
+                    roleName: course.roles[0].name
+                }, 'Rôle supprimé avec succès');
+            }
+    
+        } catch (error) {
+            logger.error({
+                error,
+                courseId,
+                message: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined
+            }, 'Erreur lors de la suppression de la formation');
+            throw error;
+        }
+    }
 }

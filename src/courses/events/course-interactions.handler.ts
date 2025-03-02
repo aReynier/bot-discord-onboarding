@@ -1,13 +1,19 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ChannelType, Client, Collection, ForumChannel, GuildBasedChannel, ModalSubmitInteraction, StringSelectMenuBuilder, StringSelectMenuInteraction, StringSelectMenuOptionBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ChannelType, Client, Collection, ForumChannel, GuildBasedChannel, GuildChannel, ModalSubmitInteraction, StringSelectMenuBuilder, StringSelectMenuInteraction, StringSelectMenuOptionBuilder } from 'discord.js';
 import { logger } from '../../config/logger';
 import { CourseService } from '../services/course.service';
 
 export class CourseInteractionsHandler {
     private courseService: CourseService;
-    private courseData: Map<string, { name: string, isCertified?: boolean, selectedStocks?: string[]; }> = new Map();
+    private courseData: Map<string, {
+        name: string,
+        isCertified?: boolean,
+        selectedStocks?: string[],
+        id?: string
+    }> = new Map();
 
     constructor(client: Client) {
         this.courseService = new CourseService(client);
+        this.courseData = new Map();
     }
 
     private async validateCourseName(interaction: ModalSubmitInteraction, courseName: string): Promise<boolean> {
@@ -390,6 +396,112 @@ export class CourseInteractionsHandler {
         }
     }
 
+
+
+    async handleDeleteCourseSelect(interaction: StringSelectMenuInteraction) {
+        try {
+            logger.debug({
+                customId: interaction.customId,
+                values: interaction.values,
+                userId: interaction.user.id
+            }, 'Début handleDeleteCourseSelect');
+
+            const courseId = interaction.values[0];
+            const course = interaction.guild?.channels.cache.get(courseId);
+    
+            if (!course) {
+                throw new Error('Formation non trouvée');
+            }
+    
+            const courseName = course.name;
+    
+            const confirmButton = new ButtonBuilder()
+                .setCustomId('confirm-delete-course')
+                .setLabel('Confirmer la suppression')
+                .setStyle(ButtonStyle.Danger);
+    
+            const cancelButton = new ButtonBuilder()
+                .setCustomId('cancel-delete-course')
+                .setLabel('Annuler')
+                .setStyle(ButtonStyle.Secondary);
+    
+            const row = new ActionRowBuilder<ButtonBuilder>()
+                .addComponents(cancelButton, confirmButton);
+    
+            await interaction.update({
+                content: `⚠️ Êtes-vous sûr de vouloir supprimer la formation "${courseName}" ?`,
+                components: [row]
+            });
+    
+            this.courseData.set(interaction.user.id, { 
+                name: courseName,
+                id: courseId
+            });
+
+            logger.info({
+                action: 'delete_course_confirmation',
+                courseId,
+                courseName,
+                userId: interaction.user.id
+            }, 'Demande de confirmation de suppression');
+    
+        } catch (error) {
+            logger.error(error, 'Erreur lors de la sélection de la formation à supprimer');
+            await interaction.update({
+                content: '❌ Une erreur est survenue.',
+                components: []
+            });
+        }
+    }
+    
+    async handleDeleteCourseConfirm(interaction: ButtonInteraction) {
+        try {
+            logger.debug({
+                customId: interaction.customId,
+                userId: interaction.user.id
+            }, 'Début handleDeleteCourseConfirm');    
+
+            const userData = this.courseData.get(interaction.user.id);
+            if (!userData || !userData.id) {
+                throw new Error('Données de suppression non trouvées');
+            }
+
+            await this.courseService.deleteCourse(userData.id);
+
+            const role = interaction.guild?.roles.cache.find(r => r.name === userData.name);
+            if (role) {
+                await role.delete('Suppression de la formation');
+                logger.info({
+                    roleId: role.id,
+                    roleName: role.name
+                }, 'Rôle Discord supprimé');
+            }
+
+            const channel = await interaction.guild?.channels.fetch(userData.id);
+            if (channel && channel instanceof GuildChannel) {
+                await channel.delete('Suppression de la formation');
+                logger.info({
+                    channelId: channel.id,
+                    channelName: channel.name
+                }, 'Forum Discord supprimé');
+            }
+    
+            await interaction.update({
+                content: `✅ Formation "${userData.name}" supprimée avec succès.`,
+                components: []
+            });
+
+            this.courseData.delete(interaction.user.id);
+    
+        } catch (error) {
+            logger.error(error, 'Erreur lors de la suppression de la formation');
+            await interaction.update({
+                content: '❌ Une erreur est survenue lors de la suppression.',
+                components: []
+            });
+        }
+    }
+
     async handleButton(interaction: ButtonInteraction) {
         switch (interaction.customId) {
             case 'validate_stock':
@@ -397,6 +509,15 @@ export class CourseInteractionsHandler {
                 break;
             case 'add_more_stock':
                 await this.handleAddMoreStock(interaction);
+            break;
+            case 'confirm-delete-course':
+                await this.handleDeleteCourseConfirm(interaction);
+                break;
+            case 'cancel-delete-course':
+                await interaction.update({
+                    content: '❌ Suppression annulée.',
+                    components: []
+                });
             break;
             default:
                 logger.warn(`Bouton inconnu: ${interaction.customId}`);
@@ -411,6 +532,9 @@ export class CourseInteractionsHandler {
                     break;
                 case 'stock_select':
                     await this.handleStockSelect(interaction);
+                    break;
+                    case 'delete-course-select':
+                    await this.handleDeleteCourseSelect(interaction);
                     break;
                 default:
                     logger.warn(`Select menu inconnu: ${interaction.customId}`);

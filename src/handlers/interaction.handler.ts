@@ -6,6 +6,7 @@ import { execute as executeDeleteCampus } from '../campuses/commands/delete-camp
 import { execute as executeShowCampusForm } from '../campuses/commands/show-campus-form.command';
 import { execute as executeSetupIdentification } from '../identification_requests/commands/setupIdentificationButton';
 import { execute as executeCreateCourse } from "../courses/commands/create-course.command";
+import { execute as executeDeleteCourse } from "../courses/commands/delete-course.command";
 import { CampusInteractionsHandler } from '../campuses/events/campus-interactions.handler';
 import { CourseInteractionsHandler } from '../courses/events/course-interactions.handler';
 
@@ -43,7 +44,8 @@ export class InteractionHandler {
                         return;
                     }
                     if (interaction.customId === 'certification_select' || 
-                        interaction.customId === 'stock_select') {
+                        interaction.customId === 'stock_select' || 
+                        interaction.customId === 'delete-course-select') {
                         await this.courseInteractions.handleSelectMenu(interaction);
                         return;
                     }
@@ -65,7 +67,9 @@ export class InteractionHandler {
                         await execute(interaction);
                         return;
                     } else if (interaction.customId === 'validate_stock' || 
-                        interaction.customId === 'add_more_stock') {
+                        interaction.customId === 'add_more_stock' || 
+                        interaction.customId === 'confirm-delete-course' || 
+                        interaction.customId === 'cancel-delete-course') {
                         await this.courseInteractions.handleButton(interaction);
                         return;
                     }
@@ -124,6 +128,9 @@ export class InteractionHandler {
                 case 'create-course':
                     await executeCreateCourse(interaction);
                     break;
+                case 'delete-course':
+                    await executeDeleteCourse(interaction);
+                break;
                 default:
                     if (!interaction.replied && !interaction.deferred) {
                         logger.warn(`Commande inconnue: ${commandName}`);
