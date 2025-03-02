@@ -7,6 +7,7 @@ import { execute as executeShowCampusForm } from '../campuses/commands/show-camp
 import { execute as executeSetupIdentification } from '../identification_requests/commands/setupIdentificationButton';
 import { execute as executeCreateCourse } from "../courses/commands/create-course.command";
 import { execute as executeDeleteCourse } from "../courses/commands/delete-course.command";
+import { execute as executeShowCourseForm } from "../courses/commands/show-course-form.command";
 import { CampusInteractionsHandler } from '../campuses/events/campus-interactions.handler';
 import { CourseInteractionsHandler } from '../courses/events/course-interactions.handler';
 
@@ -66,7 +67,10 @@ export class InteractionHandler {
                         const { execute } = await import('../identification_requests/events/handleRulesAcceptance');
                         await execute(interaction);
                         return;
-                    } else if (interaction.customId === 'validate_stock' || 
+                    } else if (
+                        interaction.customId === 'show-create-course' || 
+                        interaction.customId === 'show-delete-course' ||
+                        interaction.customId === 'validate_stock' || 
                         interaction.customId === 'add_more_stock' || 
                         interaction.customId === 'confirm-delete-course' || 
                         interaction.customId === 'cancel-delete-course') {
@@ -110,6 +114,9 @@ export class InteractionHandler {
 
         try {
             switch (commandName) {
+                case 'course-form':
+                    await executeShowCourseForm(interaction);
+                    break;
                 case 'create-campus':
                     await executeCreateCampus(interaction);
                     break;

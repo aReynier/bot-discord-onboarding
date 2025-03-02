@@ -13,6 +13,7 @@ import { data as updatePostCommand } from '../channels/commands/modify-stock-cha
 import { data as deletePostCommand } from '../channels/commands/delete-stock-post.command';
 import { data as createCourseCommand } from '../courses/commands/create-course.command';
 import { data as deleteCourseCommand } from '../courses/commands/delete-course.command';
+import { data as showCourseFormCommand } from '../courses/commands/show-course-form.command';
 dotenv.config();
 
 // Vérification des variables d'environnement requises
@@ -35,6 +36,7 @@ const commands = [
     deletePostCommand.toJSON(),
     createCourseCommand.toJSON(),
     deleteCourseCommand.toJSON(),
+    showCourseFormCommand.toJSON(),
 ];
 
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);

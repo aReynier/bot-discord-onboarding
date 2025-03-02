@@ -1,6 +1,8 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ChannelType, Client, Collection, ForumChannel, GuildBasedChannel, GuildChannel, ModalSubmitInteraction, StringSelectMenuBuilder, StringSelectMenuInteraction, StringSelectMenuOptionBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ChannelType, Client, Collection, CommandInteraction, ForumChannel, GuildBasedChannel, GuildChannel, ModalSubmitInteraction, StringSelectMenuBuilder, StringSelectMenuInteraction, StringSelectMenuOptionBuilder } from 'discord.js';
 import { logger } from '../../config/logger';
 import { CourseService } from '../services/course.service';
+import { execute as executeCreateCourse } from '../commands/create-course.command';
+import { execute as executeDeleteCourse } from '../commands/delete-course.command';
 
 export class CourseInteractionsHandler {
     private courseService: CourseService;
@@ -502,8 +504,38 @@ export class CourseInteractionsHandler {
         }
     }
 
+    private async handleShowCreateCourse(interaction: ButtonInteraction) {
+    try {
+        await executeCreateCourse(interaction as unknown as CommandInteraction);
+    } catch (error) {
+        logger.error(error, 'Erreur lors de la redirection vers create-course');
+        await interaction.reply({
+            content: '❌ Une erreur est survenue.',
+            ephemeral: true
+        });
+    }
+}
+
+private async handleShowDeleteCourse(interaction: ButtonInteraction) {
+    try {
+        await executeDeleteCourse(interaction as unknown as CommandInteraction);
+    } catch (error) {
+        logger.error(error, 'Erreur lors de la redirection vers delete-course');
+        await interaction.reply({
+            content: '❌ Une erreur est survenue.',
+            ephemeral: true
+        });
+    }
+}
+
     async handleButton(interaction: ButtonInteraction) {
         switch (interaction.customId) {
+            case 'show-create-course':
+            await this.handleShowCreateCourse(interaction);
+            break;
+            case 'show-delete-course':
+                await this.handleShowDeleteCourse(interaction);
+            break;
             case 'validate_stock':
                 await this.handleValidateStock(interaction);
                 break;
@@ -548,5 +580,5 @@ export class CourseInteractionsHandler {
                 });
             }
         }
-    }
+    }  
 }
