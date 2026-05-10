@@ -8,7 +8,7 @@ export interface PermissionCheckResult {
 }
 
 export class PermissionService {
-  private static readonly CHANNEL_MANAGEMENT_ROLES = ['Administrateur', 'Directeur', 'CDP'];
+  private static readonly CHANNEL_MANAGEMENT_ROLES = ['admin', 'Directeur', 'CDP'];
 
   /**
    * Vérifie si un membre a les permissions requises selon une liste de rôles autorisés
