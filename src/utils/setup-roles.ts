@@ -10,7 +10,7 @@ const client = new Client({
 
 const requiredRoles = [
     {
-        name: 'Administrateur',
+        name: 'Admin',
         color: '#FF0000',
         reason: 'Rôle administrateur pour la gestion des campus'
     },

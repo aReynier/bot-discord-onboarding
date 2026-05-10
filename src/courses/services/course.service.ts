@@ -1,5 +1,6 @@
-import { ChannelType, Client, Guild, GuildChannel } from 'discord.js';
+import { ChannelType, Client, GuildChannel } from 'discord.js';
 import { logger } from '../../config/logger';
+import { authService } from '../../services/auth.service';
 
 interface GuildData {
     uuid: string;
@@ -16,8 +17,8 @@ interface CategoryData {
 }
 
 interface Course {
-    uuidCourse: string;
-    name: string;
+    idCourse: string;
+    nameCourse: string;
     isCertified: boolean;
     uuidGuild: string;
     uuidCategory: string;
@@ -42,14 +43,14 @@ export class CourseService {
     private apiUrl: string;
     private client: Client;
     private readonly SIMPLON_GUILD: GuildData = {
-        uuid: "1338499599584722965",
+        uuid: process.env.GUILD_ID!,
         name: "Simplon",
         memberCount: "0",
         configuration: {}
     };
     private readonly TEMPLATE_CATEGORY: CategoryData = {
-        uuid: "1344811915301490748",
-        uuidGuild: "1338499599584722965",
+        uuid: process.env.COURSE_TEMPLATE_CATEGORY_ID!,
+        uuidGuild: process.env.GUILD_ID!,
         name: "Templates Formations",
         position: 0
     };
@@ -61,14 +62,17 @@ export class CourseService {
 
     private async ensureGuild(): Promise<void> {
             try {
-                const response = await fetch(`${this.apiUrl}/guilds/${this.SIMPLON_GUILD.uuid}`);
+                const headers = await authService.getAuthHeaders();
+                
+                const response = await fetch(`${this.apiUrl}/guilds/${this.SIMPLON_GUILD.uuid}`, {
+                    headers,
+                });
+                console.log(response);
                 
                 if (!response.ok) {
                     const createResponse = await fetch(`${this.apiUrl}/guilds`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers,
                         body: JSON.stringify(this.SIMPLON_GUILD),
                     });
     
@@ -90,16 +94,17 @@ export class CourseService {
                 categoryData: this.TEMPLATE_CATEGORY,
                 endpoint: `${this.apiUrl}/categories/${this.TEMPLATE_CATEGORY.uuid}`
             }, 'Vérification de la catégorie dans l\'API');
+            const headers = await authService.getAuthHeaders();
     
-            const response = await fetch(`${this.apiUrl}/categories/${this.TEMPLATE_CATEGORY.uuid}`);
+            const response = await fetch(`${this.apiUrl}/categories/${this.TEMPLATE_CATEGORY.uuid}`, {
+                headers,
+            });
             const categoryData = await response.json();
             
             if (!response.ok || !categoryData || !categoryData.uuid) {
                 const createResponse = await fetch(`${this.apiUrl}/categories`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify(this.TEMPLATE_CATEGORY),
                 });
 
@@ -144,6 +149,9 @@ export class CourseService {
             await this.ensureGuild();
             await this.ensureTemplateCategory();
 
+
+            const headers = await authService.getAuthHeaders();
+
             const guildId = process.env.GUILD_ID;
             if (!guildId) {
                 throw new Error('GUILD_ID non défini dans les variables d\'environnement');
@@ -154,7 +162,10 @@ export class CourseService {
                 throw new Error('Impossible de trouver le serveur Discord');
             }
 
-            const categoryId = "1344811915301490748";
+            const categoryId = process.env.COURSE_TEMPLATE_CATEGORY_ID;
+            if (!categoryId) {
+                throw new Error('COURSE_TEMPLATE_CATEGORY_ID non défini dans les variables d\'environnement');
+            }
 
             const forumName = name;
             const existingForum = guild.channels.cache.find(
@@ -188,9 +199,7 @@ export class CourseService {
 
             const roleResponse = await fetch(`${this.apiUrl}/roles`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({
                     name: role.name,
                     uuidGuild: guildId,
@@ -208,7 +217,7 @@ export class CourseService {
             }
 
             const courseData = {
-                name,
+                nameCourse: name,
                 isCertified,
                 uuidGuild: guildId,
                 uuidCategory: categoryId,
@@ -222,9 +231,7 @@ export class CourseService {
 
             const response = await fetch(`${this.apiUrl}/courses`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify(courseData),
             });
 
@@ -245,6 +252,7 @@ export class CourseService {
 
     async deleteCourse(courseId: string): Promise<void> {
         try {
+            const headers = await authService.getAuthHeaders();
             const discordChannel = await this.client.channels.fetch(courseId);
             if (!discordChannel || !('name' in discordChannel)) {
                 throw new Error('Course not found');
@@ -259,7 +267,9 @@ export class CourseService {
                 channelName: discordChannel.name
             }, 'Channel Discord trouvé');
     
-            const response = await fetch(`${this.apiUrl}/courses`);
+            const response = await fetch(`${this.apiUrl}/courses`, {
+                headers,
+            });
         
             if (!response.ok) {
                 const errorData = await response.text();
@@ -272,16 +282,16 @@ export class CourseService {
     
             const { data: courses } = await response.json();
             
-            const course = courses.find((c: Course) => c.name === discordChannel.name);
+            const course = courses.find((c: Course) => c.nameCourse === discordChannel.name);
             
             if (!course) {
                 throw new Error(`Formation "${discordChannel.name}" non trouvée`);
             }
     
             logger.debug({
-                courseName: course.name,
-                courseUuid: course.uuid,
-                roles: course.roles
+                courseName: course.nameCourse,
+                courseUuid: course.idCourse,
+                roles: course.uuidRole
             }, 'Formation trouvée avec ses rôles');
     
             // Stocker l'ID du rôle pour plus tard
@@ -289,12 +299,14 @@ export class CourseService {
     
             // Supprimer d'abord la formation
             logger.debug({
-                courseUuid: course.uuid,
-                endpoint: `${this.apiUrl}/courses/${course.uuid}`
+                courseUuid: course.idCourse,
+                endpoint: `${this.apiUrl}/courses/${course.idCourse}`
             }, 'Tentative de suppression de la formation');
     
-            const deleteResponse = await fetch(`${this.apiUrl}/courses/${course.uuid}`, {
-                method: 'DELETE'
+            const deleteResponse = await fetch(`${this.apiUrl}/courses/${course.idCourse}`, {
+                method: 'DELETE',
+                headers,
+                body: '{}'
             });
     
             if (!deleteResponse.ok) {
@@ -307,8 +319,8 @@ export class CourseService {
             }
     
             logger.info({
-                courseId: course.uuid,
-                courseName: course.name
+                courseId: course.idCourse,
+                courseName: course.nameCourse
             }, 'Formation supprimée avec succès');
     
             // Puis supprimer le rôle si on en avait un
@@ -319,7 +331,9 @@ export class CourseService {
                 }, 'Tentative de suppression du rôle');
     
                 const deleteRoleResponse = await fetch(`${this.apiUrl}/roles/${roleId}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers,
+                    body: '{}'
                 });
     
                 if (!deleteRoleResponse.ok) {

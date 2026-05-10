@@ -9,7 +9,7 @@ import {
 } from 'discord.js';
 import { logger } from '../../config/logger';
 
-const AUTHORIZED_ROLES = ['Administrateur', 'Directeur', 'CDP'];
+const AUTHORIZED_ROLES = ['admin', 'Directeur', 'CDP'];
 
 async function checkUserPermissions(interaction: CommandInteraction): Promise<boolean> {
     const member = interaction.member as GuildMember;

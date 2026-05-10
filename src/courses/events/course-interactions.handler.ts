@@ -165,7 +165,7 @@ export class CourseInteractionsHandler {
     }
     
     private async getStockChannels(interaction: StringSelectMenuInteraction) {
-        const stockCategoryId = "1344320786722455552";
+        const stockCategoryId = "1381268608566558881";
         const stockChannels = interaction.guild?.channels.cache.filter(channel => 
             channel.parentId === stockCategoryId
         );
@@ -302,7 +302,7 @@ export class CourseInteractionsHandler {
 
     async handleAddMoreStock(interaction: ButtonInteraction) {
         try {
-            const stockCategoryId = "1344320786722455552";
+            const stockCategoryId = "1381268608566558881";
             const stockChannels = interaction.guild?.channels.cache.filter(channel => 
                 channel.parentId === stockCategoryId
             );
@@ -360,7 +360,7 @@ export class CourseInteractionsHandler {
     }
     
     private async getForumChannel(interaction: ButtonInteraction) {
-        const forumCategoryId = "1344811915301490748";
+        const forumCategoryId = process.env.COURSE_TEMPLATE_CATEGORY_ID;
         const forumChannel = interaction.guild?.channels.cache.filter(
             channel => 
                 channel.parentId === forumCategoryId && 

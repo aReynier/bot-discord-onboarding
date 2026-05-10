@@ -9,7 +9,7 @@ import {
 } from 'discord.js';
 import { logger } from '../../config/logger';
 
-const AUTHORIZED_ROLES = ['Administrateur', 'Directeur', 'CDP'];
+const AUTHORIZED_ROLES = ['admin', 'Directeur', 'CDP'];
 
 async function checkUserPermissions(interaction: CommandInteraction): Promise<boolean> {
     const member = interaction.member as GuildMember;
@@ -56,7 +56,10 @@ export async function execute(interaction: CommandInteraction) {
             throw new Error('Guild not found');
         }
 
-        const TEMPLATE_CATEGORY_ID = "1344811915301490748";
+        const TEMPLATE_CATEGORY_ID = process.env.COURSE_TEMPLATE_CATEGORY_ID;
+        if (!TEMPLATE_CATEGORY_ID) {
+            throw new Error('COURSE_TEMPLATE_CATEGORY_ID non défini dans les variables d\'environnement');
+        }
 
         const courses = guild.channels.cache.filter(channel => 
             channel.type === ChannelType.GuildForum && 

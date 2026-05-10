@@ -58,12 +58,12 @@ describe('Course Interactions Handler', () => {
                         ['stock-1', {
                             name: 'stock-1-channel',
                             id: 'stock-1',
-                            parentId: '1344320786722455552'
+                            parentId: '1381268608566558881'
                         } as unknown as GuildChannel],
                         ['stock-2', {
                             name: 'stock-2-channel',
                             id: 'stock-2',
-                            parentId: '1344320786722455552'
+                            parentId: '1381268608566558881'
                         } as unknown as GuildChannel]
                     ])
                 }
@@ -267,12 +267,12 @@ describe('Course Interactions Handler', () => {
                             ['stock-1', {
                                 name: 'stock-1-channel',
                                 id: 'stock-1',
-                                parentId: '1344320786722455552'
+                                parentId: '1381268608566558881'
                             } as unknown as GuildChannel],
                             ['stock-2', {
                                 name: 'stock-2-channel',
                                 id: 'stock-2',
-                                parentId: '1344320786722455552'
+                                parentId: '1381268608566558881'
                             } as unknown as GuildChannel]
                         ])
                     }

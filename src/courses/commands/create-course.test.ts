@@ -76,7 +76,7 @@ describe('Create Course Command', () => {
             mockInteraction.member = {
                 roles: {
                     cache: new Collection<string, Role>([
-                        ['1', { name: 'Administrateur' } as Role],
+                        ['1', { name: 'admin' } as Role],
                         ['2', { name: 'CDP' } as Role]
                     ])
                 },
@@ -126,11 +126,11 @@ describe('Create Course Command', () => {
             expect(mockInteraction.reply).not.toHaveBeenCalled();
         });
 
-        it('should allow users with Administrateur role', async () => {
+        it('should allow users with Administrator role', async () => {
             mockInteraction.member = {
                 roles: {
                     cache: new Collection<string, Role>([
-                        ['1', { name: 'Administrateur' } as Role]
+                        ['1', { name: 'admin' } as Role]
                     ])
                 },
                 id: '123456789'
@@ -142,7 +142,7 @@ describe('Create Course Command', () => {
             expect(mockInteraction.reply).not.toHaveBeenCalled();
         });
 
-        it('should allow users with Directeur role', async () => {
+        it('should allow users with Director role', async () => {
             mockInteraction.member = {
                 roles: {
                     cache: new Collection<string, Role>([
