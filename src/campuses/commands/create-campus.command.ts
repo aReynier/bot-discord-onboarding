@@ -5,7 +5,6 @@ import {
     TextInputBuilder,
     TextInputStyle,
     ActionRowBuilder,
-    TextInputComponent
 } from 'discord.js';
 import { logger } from '../../config/logger';
 

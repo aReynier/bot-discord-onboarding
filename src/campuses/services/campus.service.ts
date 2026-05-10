@@ -1,5 +1,6 @@
 import { logger } from '../../config/logger';
 import { Client } from 'discord.js';
+import { authService } from '../../services/auth.service';
 
 interface ApiResponse<T> {
     message: string;
@@ -28,7 +29,8 @@ export class CampusService {
 
     async getAllCampuses(): Promise<Campus[]> {
         try {
-            const response = await fetch(`${this.apiUrl}/campuses`);
+            const headers = await authService.getAuthHeaders();
+            const response = await fetch(`${this.apiUrl}/campuses`, { headers });
             if (!response.ok) {
                 logger.error({
                     status: response.status,
@@ -47,7 +49,8 @@ export class CampusService {
 
     async getCampus(id: string): Promise<Campus> {
         try {
-            const response = await fetch(`${this.apiUrl}/campuses/${id}`);
+            const headers = await authService.getAuthHeaders();
+            const response = await fetch(`${this.apiUrl}/campuses/${id}`, { headers });
             if (!response.ok) {
                 logger.error({
                     status: response.status,
@@ -70,6 +73,7 @@ export class CampusService {
     }
 
     async createCampus(name: string): Promise<Campus> {
+        const headers = await authService.getAuthHeaders();
         if (this.isCreating) {
             throw new Error('Une création de campus est déjà en cours.');
         }
@@ -121,9 +125,7 @@ export class CampusService {
 
                 const response = await fetch(`${this.apiUrl}/campuses`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: headers,
                     body: JSON.stringify({
                         name: name,
                         uuidRole: role.id,
@@ -164,6 +166,7 @@ export class CampusService {
     }
 
     async updateCampus(id: string, name: string): Promise<Campus> {
+        const headers = await authService.getAuthHeaders();
         try {
             // Récupérer d'abord les informations actuelles du campus
             const currentCampus = await this.getCampus(id);
@@ -197,9 +200,7 @@ export class CampusService {
             // Mettre à jour le campus dans l'API
             const response = await fetch(`${this.apiUrl}/campuses/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({ name })
             });
             
@@ -212,6 +213,7 @@ export class CampusService {
     }
 
     async deleteCampus(id: string): Promise<void> {
+        const headers = await authService.getAuthHeaders();
         try {
             // Récupérer d'abord les informations du campus
             const campus = await this.getCampus(id);
@@ -248,7 +250,8 @@ export class CampusService {
 
             // Supprimer le campus dans l'API
             const response = await fetch(`${this.apiUrl}/campuses/${id}`, {
-                method: 'DELETE'
+                headers: headers,
+                method: 'DELETE',
             });
             
             if (!response.ok) {
@@ -267,12 +270,11 @@ export class CampusService {
 
     // RG28: Notification des personnes concernées
     async notifyCampusMembers(campusId: string, message: string): Promise<void> {
+        const headers = await authService.getAuthHeaders();
         try {
             const response = await fetch(`${this.apiUrl}/campuses/${campusId}/notify`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({ message })
             });
             
